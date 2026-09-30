@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Pesquisa de Intenção de Voto</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: #f2f4f8;
+    color: #1f2430;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 0 16px 60px; }
+
+  .hero {
+    background-image: linear-gradient(180deg, rgba(20,20,30,.35), rgba(20,20,30,.75)), url('img/hero-bg.jpg');
+    background-size: cover;
+    background-position: center 20%;
+    padding: 40px 20px 70px;
+    text-align: center;
+    color: #fff;
+  }
+  .hero .kicker { text-transform: uppercase; letter-spacing: .08em; font-size: 0.72rem; font-weight: 700; color: #ffd84d; margin-bottom: 8px; }
+  .hero h1 { font-size: 1.5rem; margin: 0 0 6px; text-shadow: 0 2px 10px rgba(0,0,0,.4); }
+  .hero p { margin: 0; opacity: .92; font-size: 0.92rem; }
+
+  .card { background: #fff; border-radius: 18px; padding: 26px 22px; box-shadow: 0 14px 34px rgba(0,0,0,.16); margin-top: -46px; position: relative; }
+
+  label.field { display: block; font-weight: 700; font-size: 0.92rem; margin-bottom: 6px; }
+  input[type=text] { width: 100%; padding: 12px 13px; border-radius: 10px; border: 1px solid #d1d5db; font-size: 1rem; margin-bottom: 24px; }
+
+  .race { margin-bottom: 22px; padding-bottom: 20px; border-bottom: 1px solid #eef0f4; }
+  .race:last-of-type { border-bottom: none; }
+  .race-label { font-weight: 700; font-size: 0.8rem; text-transform: uppercase; letter-spacing: .04em; color: #6b7280; margin-bottom: 10px; }
+
+  .opt { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1.5px solid #e5e7eb; border-radius: 12px; margin-bottom: 8px; cursor: pointer; transition: border-color .15s, background .15s; }
+  .opt:has(input:checked) { border-color: #4f46e5; background: #f5f5ff; }
+  .opt:hover { border-color: #4f46e5; }
+  .opt input { width: 20px; height: 20px; accent-color: #4f46e5; flex-shrink: 0; }
+  .opt-photo { width: 46px; height: 46px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background: #e5e7eb; border: 2px solid #fff; box-shadow: 0 0 0 1px #e5e7eb; }
+  .opt-photo.placeholder { display: flex; align-items: center; justify-content: center; font-weight: 700; color: #9ca3af; font-size: 1rem; }
+  .opt .name { font-weight: 700; display: block; }
+  .opt .party { color: #6b7280; font-size: 0.78rem; }
+  .opt.opt-nao { padding-left: 12px; }
+  .opt.opt-nao .opt-photo { display: none; }
+
+  .btn { background: #4f46e5; color: #fff; border: none; border-radius: 12px; padding: 15px 20px; font-size: 1.02rem; font-weight: 700; cursor: pointer; width: 100%; margin-top: 8px; }
+  .btn:disabled { opacity: .55; cursor: default; }
+  .msg { text-align: center; padding: 46px 10px; }
+  .msg h2 { margin-bottom: 8px; }
+  .err { color: #dc2626; font-size: 0.88rem; margin-top: 6px; display: none; }
+  .foot-link { display: block; text-align: center; margin-top: 26px; color: #9ca3af; font-size: 0.75rem; text-decoration: none; }
+
+  /* resultados */
+  .res-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  .res-table th, .res-table td { text-align: left; padding: 9px 8px; border-bottom: 1px solid #eef0f4; font-size: 0.88rem; }
+  .res-table th { color: #6b7280; font-size: 0.75rem; text-transform: uppercase; }
+  .bar-bg { background: #eef0f4; border-radius: 6px; height: 8px; margin-top: 4px; overflow: hidden; }
+  .bar-fill { background: #4f46e5; height: 100%; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+"use strict";
+
+// Mesma lista de cargos/candidatos usada no backend (netlify/functions/votar.js).
+// Se precisar trocar algum nome/partido/foto, edite aqui e lá também (o backend
+// não usa o campo "foto", só id/candidato/partido pro cálculo dos resultados).
+const RACES = [
+  { id: 'presidente', label: 'Presidente', candidato: 'Lula', partido: 'PT · 13', foto: 'img/lula.jpg' },
+  { id: 'governador', label: 'Governador', candidato: 'Rafael Fonteles', partido: 'PT · 13', foto: 'img/rafael-fonteles.jpg' },
+  { id: 'senador1', label: 'Senador (1ª vaga)', candidato: 'Ciro Nogueira', partido: 'PP · 111', foto: 'img/ciro-nogueira.jpg' },
+  { id: 'senador2', label: 'Senador (2ª vaga)', candidato: 'Marcelo Castro', partido: 'MDB · 151', foto: 'img/marcelo-castro.jpg' },
+  { id: 'dep_estadual', label: 'Deputado Estadual', candidato: 'Firmino Paulo', partido: 'PT · 13789', foto: 'img/firmino-paulo.jpg' },
+  { id: 'dep_federal', label: 'Deputado Federal', candidato: 'Julio Arcoverde', partido: 'PP · 1111', foto: 'img/julio-arcoverde.jpg' },
+];
+
+function app() { return document.getElementById('app'); }
+function escapeHtml(str) {
+  return String(str == null ? '' : str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function photoHtml(r) {
+  if (r.foto) return `<img class="opt-photo" src="${r.foto}" alt="">`;
+  const initial = (r.candidato || '?').trim().charAt(0).toUpperCase();
+  return `<span class="opt-photo placeholder">${initial}</span>`;
+}
+async function postJson(path, body) {
+  const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  let data = null;
+  try { data = await res.json(); } catch (e) {}
+  return { ok: res.ok, status: res.status, data };
+}
+
+function route() {
+  if (location.hash.replace(/^#\/?/, '') === 'resultados') return renderResultados();
+  return renderForm();
+}
+window.addEventListener('hashchange', route);
+
+function heroHtml() {
+  return `<div class="hero">
+    <div class="kicker">Dr. Ricardo Camarço &amp; José de Freitas</div>
+    <h1>Pesquisa de Intenção de Voto</h1>
+    <p>A seleção de candidatos do Dr. Ricardo Camarço e do povo de José de Freitas</p>
+  </div>`;
+}
+
+function renderForm() {
+  const already = localStorage.getItem('votou_camarco_2026');
+  if (already) {
+    app().innerHTML = `${heroHtml()}<div class="wrap"><div class="card msg">
+      <h2>Você já enviou sua resposta.</h2>
+      <p>Obrigado por participar! Se isso for um engano, fale com quem te enviou o link.</p>
+    </div></div>`;
+    return;
+  }
+  app().innerHTML = `${heroHtml()}<div class="wrap"><div class="card">
+    <p style="margin-top:0; color:#6b7280; font-size:0.92rem;">Diga quais desses candidatos você tem intenção de votar. Leva menos de 1 minuto.</p>
+    <form id="vote-form">
+      <label class="field">Seu nome completo</label>
+      <input type="text" id="nome" autocomplete="name" required>
+      ${RACES.map((r) => `<div class="race">
+        <div class="race-label">${escapeHtml(r.label)}</div>
+        <label class="opt"><input type="radio" name="${r.id}" value="sim" required>${photoHtml(r)}<span><span class="name">${escapeHtml(r.candidato)}</span><span class="party">${escapeHtml(r.partido)}</span></span></label>
+        <label class="opt opt-nao"><input type="radio" name="${r.id}" value="nao"><span class="name">Não vou votar nele</span></label>
+      </div>`).join('')}
+      <div class="err" id="form-err"></div>
+      <button type="submit" class="btn" id="submit-btn">Enviar minha resposta</button>
+    </form>
+    <a href="#resultados" class="foot-link">admin</a>
+  </div></div>`;
+  document.getElementById('vote-form').addEventListener('submit', handleSubmit);
+}
+
+async function handleSubmit(e) {
+  e.preventDefault();
+  const errEl = document.getElementById('form-err');
+  errEl.style.display = 'none';
+  const btn = document.getElementById('submit-btn');
+  const nome = document.getElementById('nome').value.trim();
+  if (!nome) { errEl.textContent = 'Digite seu nome.'; errEl.style.display = 'block'; return; }
+  const respostas = {};
+  for (const r of RACES) {
+    const el = document.querySelector(`input[name="${r.id}"]:checked`);
+    if (!el) { errEl.textContent = 'Responda todos os cargos antes de enviar.'; errEl.style.display = 'block'; return; }
+    respostas[r.id] = el.value;
+  }
+  btn.disabled = true; btn.textContent = 'Enviando...';
+  try {
+    const { ok, status, data } = await postJson('/api/votar', { nome, respostas });
+    if (ok) {
+      localStorage.setItem('votou_camarco_2026', '1');
+      app().innerHTML = `${heroHtml()}<div class="wrap"><div class="card msg">
+        <h2>Obrigado, ${escapeHtml(nome.split(' ')[0])}!</h2>
+        <p>Sua resposta foi registrada com sucesso.</p>
+      </div></div>`;
+      return;
+    }
+    if (status === 409 || (data && data.error === 'ja_votou')) {
+      localStorage.setItem('votou_camarco_2026', '1');
+      errEl.textContent = 'Já existe uma resposta registrada com esse nome.';
+    } else {
+      errEl.textContent = 'Não foi possível enviar. Tente novamente em instantes.';
+    }
+    errEl.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Enviar minha resposta';
+  } catch (err) {
+    errEl.textContent = 'Não foi possível enviar. Verifique sua internet e tente de novo.';
+    errEl.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Enviar minha resposta';
+  }
+}
+
+function renderResultados() {
+  app().innerHTML = `${heroHtml()}<div class="wrap"><div class="card">
+    <h2 style="margin-top:0;">Resultados</h2>
+    <p style="color:#6b7280; font-size:0.92rem;">Digite a senha de acesso.</p>
+    <input type="password" id="senha" placeholder="Senha">
+    <div class="err" id="res-err"></div>
+    <button class="btn" id="res-btn">Ver resultados</button>
+    <div id="res-body"></div>
+    <a href="#" class="foot-link" id="back-link">voltar ao formulário</a>
+  </div></div>`;
+  document.getElementById('back-link').onclick = (e) => { e.preventDefault(); location.hash = ''; };
+  document.getElementById('res-btn').onclick = async () => {
+    const senha = document.getElementById('senha').value;
+    const errEl = document.getElementById('res-err');
+    errEl.style.display = 'none';
+    if (!senha) { errEl.textContent = 'Digite a senha.'; errEl.style.display = 'block'; return; }
+    const { ok, data } = await postJson('/api/votar/resultados', { senha });
+    if (!ok) {
+      errEl.textContent = (data && data.error === 'senha_incorreta') ? 'Senha incorreta.' : 'Não foi possível carregar.';
+      errEl.style.display = 'block';
+      return;
+    }
+    const body = document.getElementById('res-body');
+    body.innerHTML = `<p style="color:#6b7280; font-size:0.9rem; margin-top:18px;">${data.total} pessoa(s) responderam.</p>
+      <table class="res-table"><thead><tr><th>Cargo / Candidato</th><th>Sim</th><th>Não</th><th>%</th></tr></thead><tbody>
+      ${data.tally.map((t) => {
+        const totalResp = t.sim + t.nao;
+        const pct = totalResp ? Math.round((t.sim * 100) / totalResp) : 0;
+        return `<tr><td>${escapeHtml(t.label)}<br><span class="party">${escapeHtml(t.candidato)} (${escapeHtml(t.partido)})</span>
+          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div></td>
+          <td>${t.sim}</td><td>${t.nao}</td><td>${pct}%</td></tr>`;
+      }).join('')}
+      </tbody></table>`;
+  };
+}
+
+route();
+</script>
+</body>
+</html>
