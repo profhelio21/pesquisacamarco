@@ -1,0 +1,9 @@
+{
+  "name": "central-pesquisas",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Central de pesquisas/formularios personalizaveis com respostas guardadas no Netlify Blobs",
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}
